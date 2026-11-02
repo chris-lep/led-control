@@ -60,10 +60,12 @@ def test_snapshot_created_and_kept(leds_root: Path, tmp_path: Path):
     cache = tmp_path / "cache"
     cache.mkdir()
     (cache / "defaults-oldboot.json").write_text("{}")
+    (cache / "defaults-oldformat.json").write_text("{}")
     store = DefaultsStore(cache, "boot1")
     store.load(sysfs.discover(leds_root))
     assert not (cache / "defaults-oldboot.json").exists()
-    assert json.loads(store.path.read_text())["platform::mute"] == {
+    assert not (cache / "defaults-oldformat.json").exists()
+    assert json.loads(store.path.read_text())["defaults"]["platform::mute"] == {
         "trigger": "audio-mute",
         "brightness": 1,
     }
@@ -129,3 +131,37 @@ def test_capture_defaults(service: LedService):
     service.capture_defaults()
     assert service.defaults.get("platform::mute") == LedDefault("none", 0)
     assert service.is_default(service.led("platform::mute"))
+
+
+@pytest.fixture
+def thinkpad(tmp_path: Path):
+    """Firmware LEDs as reported right after boot: brightness 0, max 255."""
+    make_led(tmp_path, "tpacpi::power", max_brightness=255)
+    make_led(tmp_path, "tpacpi::standby", max_brightness=255)
+    root = make_led(tmp_path, "tpacpi::lid_logo_dot", max_brightness=255)
+    svc = LedService(FileWriter(root), DefaultsStore(tmp_path / "cache", "boot1"), root)
+    svc.load_defaults()
+    return svc
+
+
+def test_firmware_leds_on_at_boot_default_to_on(thinkpad: LedService):
+    assert thinkpad.defaults.get("tpacpi::power") == LedDefault("none", 255)
+    assert thinkpad.defaults.get("tpacpi::lid_logo_dot") == LedDefault("none", 255)
+    assert thinkpad.defaults.get("tpacpi::standby") == LedDefault("none", 0)
+    assert thinkpad.led("tpacpi::power").brightness == 255
+    assert all(thinkpad.is_default(led) for led in thinkpad.leds())
+
+
+def test_firmware_led_reads_are_trusted_after_a_write(thinkpad: LedService, tmp_path: Path):
+    thinkpad.set("tpacpi::power", "brightness", "0")
+    assert thinkpad.led("tpacpi::power").brightness == 0
+    assert not thinkpad.is_default(thinkpad.led("tpacpi::power"))
+
+    # Survives an app restart within the same boot.
+    again = LedService(thinkpad.writer, DefaultsStore(tmp_path / "cache", "boot1"), thinkpad.root)
+    again.load_defaults()
+    assert again.led("tpacpi::power").brightness == 0
+    assert again.defaults.get("tpacpi::power") == LedDefault("none", 255)
+
+    again.reset("tpacpi::power")
+    assert again.led("tpacpi::power").brightness == 255

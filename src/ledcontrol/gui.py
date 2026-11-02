@@ -9,7 +9,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import defaults  # noqa: E402
+from . import defaults, quirks  # noqa: E402
 from .privileged import HelperClient, WriteError  # noqa: E402
 from .service import LedService  # noqa: E402
 from .sysfs import Led  # noqa: E402
@@ -44,7 +44,8 @@ class LedCard(Gtk.Frame):
         self._add_row(0, "Trigger", self.trigger)
 
         self.max = led.max_brightness
-        if self.max <= 1:
+        on_off = self.max <= 1 or quirks.is_firmware_led(led.name)
+        if on_off:
             self.brightness = Gtk.Switch(halign=Gtk.Align.START)
             self.brightness.connect("notify::active", self._on_switch)
         else:
@@ -53,7 +54,7 @@ class LedCard(Gtk.Frame):
             self.brightness.set_draw_value(True)
             self.brightness.set_hexpand(True)
             self.brightness.connect("value-changed", self._on_scale)
-        self._add_row(1, f"Brightness (0–{self.max})", self.brightness)
+        self._add_row(1, "On" if on_off else f"Brightness (0–{self.max})", self.brightness)
 
         self.extras = Gtk.Grid(column_spacing=12, row_spacing=6)
         self.grid.attach(self.extras, 0, 2, 2, 1)
@@ -68,6 +69,16 @@ class LedCard(Gtk.Frame):
         )
         box.append(title)
         box.append(self.grid)
+        if quirks.is_firmware_led(led.name):
+            note = Gtk.Label(
+                label="Firmware LED: the driver can't read its state, so the shown value is "
+                "a guess until you change it here.",
+                xalign=0,
+                wrap=True,
+            )
+            note.add_css_class("dim-label")
+            note.add_css_class("caption")
+            box.append(note)
         self.set_child(box)
         self.update(led)
 

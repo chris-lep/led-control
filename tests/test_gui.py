@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import make_led
 
 from ledcontrol.defaults import DefaultsStore
 from ledcontrol.privileged import HELPER_PATH, HelperClient
@@ -60,7 +61,8 @@ def test_cards_for_each_led(window):
         "tpacpi::lid_logo_dot",
     ]
     assert isinstance(window.cards["platform::mute"].brightness, Gtk.Switch)
-    assert isinstance(window.cards["tpacpi::lid_logo_dot"].brightness, Gtk.Scale)
+    assert isinstance(window.cards["tpacpi::lid_logo_dot"].brightness, Gtk.Switch)
+    assert isinstance(window.cards["tpacpi::kbd_backlight"].brightness, Gtk.Scale)
     assert set(window.cards["tpacpi::lid_logo_dot"]._extra_entries) == {"delay_on", "delay_off"}
 
 
@@ -94,3 +96,24 @@ def test_write_error_is_shown(window):
     window.run(window.service.set, "missing", "trigger", "none")
     assert window.status.get_visible()
     assert "no such LED" in window.status.get_text()
+
+
+def test_firmware_led_gets_switch(app, tmp_path: Path):
+    root = make_led(tmp_path, "tpacpi::power", max_brightness=255)
+    client = HelperClient([sys.executable, "-I", str(HELPER_PATH), "--root", str(root)])
+    service = LedService(client, DefaultsStore(tmp_path / "cache", "boot"), root)
+    service.load_defaults()
+    win = gui.MainWindow(app, service, client)
+    spin(lambda: client.running and win.list.get_sensitive())
+    try:
+        card = win.cards["tpacpi::power"]
+        assert isinstance(card.brightness, Gtk.Switch)
+        assert card.brightness.get_active()  # guessed "on" although sysfs says 0
+        card.brightness.set_active(False)
+        assert (root / "tpacpi::power" / "brightness").read_text() == "0"
+        assert not card.brightness.get_active()
+        card.brightness.set_active(True)
+        assert (root / "tpacpi::power" / "brightness").read_text() == "255"
+    finally:
+        client.close()
+        win.destroy()

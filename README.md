@@ -31,7 +31,7 @@ Python, because a conda/venv Python usually has no GTK bindings.
 
 The kernel has no "default" setting. So the first time the app runs after a boot, it
 records every LED's trigger and brightness in
-`~/.cache/led-control/defaults-<boot_id>.json`, and **Reset** returns to that state.
+`~/.cache/led-control/defaults-v2-<boot_id>.json`, and **Reset** returns to that state.
 Snapshots from earlier boots are deleted automatically.
 
 If you changed LEDs by hand before opening the app, use the menu entry
@@ -40,6 +40,21 @@ reopen the app.
 
 Resetting writes the trigger first, then the brightness, and the brightness only when
 the trigger is `none` (any other trigger drives the brightness itself).
+
+### ThinkPad firmware LEDs
+
+`tpacpi::power`, `tpacpi::lid_logo_dot`, `tpacpi::standby`, `tpacpi::thinkvantage` and
+similar are driven by the embedded controller, and `thinkpad_acpi` can't read them back.
+After boot the kernel reports brightness 0, even though the power LED and the lid dot are
+on. The app therefore assumes those two are **on** at boot, and only trusts the reported
+value once it has written to the LED itself (recorded in the snapshot as `touched`).
+If you change one of these LEDs from a shell, the app can show it wrong.
+
+These LEDs only know on and off (and blink, via the `timer` trigger), although they report
+`max_brightness=255`, so the app shows a switch for them.
+
+The power LED's colour, the charging LED and the FnLock LED are handled entirely by the
+firmware. They are not in `/sys/class/leds`, so they can't be controlled.
 
 ## Doing the same by hand
 
@@ -60,6 +75,7 @@ echo audio-mute | sudo tee /sys/class/leds/platform::mute/trigger   # back to de
 | `src/ledcontrol/helper.py` | Root helper: JSON lines on stdin/stdout, validates every write. Stdlib only, run with `python3 -I` |
 | `src/ledcontrol/privileged.py` | Starts the helper via `pkexec` and talks to it |
 | `src/ledcontrol/defaults.py` | Per-boot default snapshot and reset logic |
+| `src/ledcontrol/quirks.py` | Hardware facts sysfs doesn't report (ThinkPad firmware LEDs) |
 | `src/ledcontrol/service.py` | GUI-independent operations (set, reset, reset all) |
 | `src/ledcontrol/gui.py` | GTK 4 interface |
 | `bin/led-control` | Launcher |

@@ -3,8 +3,12 @@
 The kernel has no "default" attribute, and every change made through sysfs is
 lost on reboot. So the state the LEDs had when the app first ran during the
 current boot is treated as the default. The snapshot lives in
-``~/.cache/led-control/defaults-<boot_id>.json`` (not in /run/user, because that
-is wiped on logout while LED changes survive until reboot).
+``~/.cache/led-control/defaults-v2-<boot_id>.json`` (not in /run/user, because
+that is wiped on logout while LED changes survive until reboot).
+
+The snapshot also records which firmware LEDs (see quirks.py) the app has
+written to, because only after a write does their reported brightness mean
+anything.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from pathlib import Path
 from .sysfs import Led
 
 BOOT_ID_PATH = Path("/proc/sys/kernel/random/boot_id")
+FORMAT = "v2"
 
 
 @dataclass(frozen=True)
@@ -41,8 +46,9 @@ def of(led: Led) -> LedDefault:
 
 class DefaultsStore:
     def __init__(self, directory: Path, boot: str) -> None:
-        self.path = directory / f"defaults-{boot}.json"
+        self.path = directory / f"defaults-{FORMAT}-{boot}.json"
         self._defaults: dict[str, LedDefault] = {}
+        self.touched: set[str] = set()
 
     def get(self, name: str) -> LedDefault | None:
         return self._defaults.get(name)
@@ -50,7 +56,7 @@ class DefaultsStore:
     def load(self, leds: Iterable[Led]) -> None:
         """Load this boot's snapshot, adding any LED not seen before.
 
-        Snapshots from earlier boots are deleted.
+        Snapshots from earlier boots (or older formats) are deleted.
         """
         self.path.parent.mkdir(parents=True, exist_ok=True)
         for old in self.path.parent.glob("defaults-*.json"):
@@ -58,9 +64,10 @@ class DefaultsStore:
                 old.unlink(missing_ok=True)
         try:
             raw = json.loads(self.path.read_text())
-            self._defaults = {name: LedDefault(**d) for name, d in raw.items()}
-        except (FileNotFoundError, json.JSONDecodeError, TypeError):
-            self._defaults = {}
+            self._defaults = {n: LedDefault(**d) for n, d in raw["defaults"].items()}
+            self.touched = set(raw.get("touched", []))
+        except (FileNotFoundError, json.JSONDecodeError, TypeError, KeyError, AttributeError):
+            self._defaults, self.touched = {}, set()
         new = {led.name: of(led) for led in leds if led.name not in self._defaults}
         if new or not self.path.exists():
             self._defaults.update(new)
@@ -71,8 +78,16 @@ class DefaultsStore:
         self._defaults = {led.name: of(led) for led in leds}
         self._save()
 
+    def mark_touched(self, name: str) -> None:
+        if name not in self.touched:
+            self.touched.add(name)
+            self._save()
+
     def _save(self) -> None:
-        data = {name: asdict(d) for name, d in sorted(self._defaults.items())}
+        data = {
+            "defaults": {name: asdict(d) for name, d in sorted(self._defaults.items())},
+            "touched": sorted(self.touched),
+        }
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2) + "\n")
         tmp.replace(self.path)

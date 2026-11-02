@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
-from . import sysfs
+from . import quirks, sysfs
 from .defaults import DefaultsStore, of, restore_ops
 from .privileged import WriteError, Writer
 from .sysfs import Led
@@ -19,10 +20,26 @@ class LedService:
         self.root = root
 
     def leds(self) -> list[Led]:
-        return sysfs.discover(self.root)
+        return [self._effective(led) for led in sysfs.discover(self.root)]
 
     def led(self, name: str) -> Led:
-        return sysfs.read_led(self.root / name)
+        return self._effective(sysfs.read_led(self.root / name))
+
+    def _effective(self, led: Led) -> Led:
+        """Replace the meaningless 0 of never-written firmware LEDs by a guess."""
+        if (
+            quirks.is_firmware_led(led.name)
+            and led.name not in self.defaults.touched
+            and led.active_trigger == "none"
+        ):
+            guess = quirks.boot_brightness(led.name, led.brightness, led.max_brightness)
+            if guess != led.brightness:
+                return dataclasses.replace(led, brightness=guess)
+        return led
+
+    def _touch(self, name: str) -> None:
+        if quirks.is_firmware_led(name):
+            self.defaults.mark_touched(name)
 
     def load_defaults(self) -> None:
         self.defaults.load(self.leds())
@@ -41,6 +58,7 @@ class LedService:
 
     def set(self, name: str, attr: str, value: str) -> None:
         self.writer.write(name, attr, value)
+        self._touch(name)
 
     def reset(self, name: str) -> None:
         default = self.defaults.get(name)
@@ -48,6 +66,7 @@ class LedService:
             raise WriteError(f"{name}: no default recorded")
         for attr, value in restore_ops(default):
             self.writer.write(name, attr, value)
+            self._touch(name)
 
     def reset_all(self) -> list[str]:
         """Reset every LED; returns error messages for the ones that failed."""
