@@ -143,3 +143,13 @@ def test_finish_identify_restores_immediately(window, leds_root: Path):
     card.finish_identify()
     assert not card.identifying
     assert (leds_root / "tpacpi::kbd_backlight" / "brightness").read_text() == "0"
+
+
+def test_trigger_dropdown_entries(window):
+    model = window.cards["platform::mute"].trigger.get_model()
+    entries = [model.get_string(i) for i in range(model.get_n_items())]
+    assert entries == [
+        "Manual control\nnone",
+        "Speaker muted\naudio-mute",
+        "Blink\ntimer",
+    ]

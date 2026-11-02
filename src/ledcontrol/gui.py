@@ -19,6 +19,34 @@ REFRESH_SECONDS = 2
 IDENTIFY_INTERVAL_MS = 300
 
 
+def _trigger_factory(with_detail: bool) -> Gtk.SignalListItemFactory:
+    """Render a trigger as its label, optionally with the raw name below it."""
+    factory = Gtk.SignalListItemFactory()
+
+    def setup(_factory, item: Gtk.ListItem) -> None:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.append(Gtk.Label(xalign=0))
+        if with_detail:
+            detail = Gtk.Label(xalign=0)
+            detail.add_css_class("dim-label")
+            detail.add_css_class("caption")
+            box.append(detail)
+        item.set_child(box)
+
+    def bind(_factory, item: Gtk.ListItem) -> None:
+        label, _, detail = item.get_item().get_string().partition("\n")
+        title = item.get_child().get_first_child()
+        title.set_text(label)
+        if with_detail:
+            sub = title.get_next_sibling()
+            sub.set_text(detail)
+            sub.set_visible(bool(detail))
+
+    factory.connect("setup", setup)
+    factory.connect("bind", bind)
+    return factory
+
+
 class LedCard(Gtk.Frame):
     """Controls for one LED."""
 
@@ -48,7 +76,10 @@ class LedCard(Gtk.Frame):
         self.grid = Gtk.Grid(column_spacing=12, row_spacing=6)
         self._trigger_names = list(led.triggers) or ["none"]
         self.trigger = Gtk.DropDown.new_from_strings(self._choices(self._trigger_names))
+        self.trigger.set_factory(_trigger_factory(with_detail=False))
+        self.trigger.set_list_factory(_trigger_factory(with_detail=True))
         self.trigger.set_enable_search(True)
+        self.trigger.set_search_match_mode(Gtk.StringFilterMatchMode.SUBSTRING)
         self.trigger.connect("notify::selected", self._on_trigger)
         self._add_row(0, "Trigger", self.trigger)
 
@@ -92,7 +123,11 @@ class LedCard(Gtk.Frame):
         self.update(led)
 
     def _choices(self, triggers: list[str]) -> list[str]:
-        return [names.trigger_choice(t, self.window.radios) for t in triggers]
+        # "label\ndetail": the factories show the parts on two lines, and search
+        # matches either.
+        return [
+            "\n".join(filter(None, names.trigger_info(t, self.window.radios))) for t in triggers
+        ]
 
     def _add_row(self, row: int, text: str, widget: Gtk.Widget) -> None:
         label = Gtk.Label(label=text, xalign=0)
