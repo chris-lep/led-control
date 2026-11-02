@@ -55,6 +55,8 @@ def window(app, leds_root: Path, tmp_path: Path):
 
 
 def test_cards_for_each_led(window):
+    title = window.cards["platform::mute"].title_label.get_label()
+    assert "Speaker mute key" in title and "platform::mute" in title
     assert list(window.cards) == [
         "platform::mute",
         "tpacpi::kbd_backlight",

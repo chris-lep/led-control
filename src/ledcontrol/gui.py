@@ -9,7 +9,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import defaults, quirks  # noqa: E402
+from . import defaults, names, quirks  # noqa: E402
 from .privileged import HelperClient, WriteError  # noqa: E402
 from .service import LedService  # noqa: E402
 from .sysfs import Led  # noqa: E402
@@ -97,7 +97,11 @@ class LedCard(Gtk.Frame):
             service = self.window.service
             is_default = service.is_default(led)
             changed = "" if is_default else "  <small>(changed)</small>"
-            self.title_label.set_markup(f"<b>{GLib.markup_escape_text(led.name)}</b>{changed}")
+            esc = GLib.markup_escape_text
+            self.title_label.set_markup(
+                f"<b>{esc(names.title(led.name))}</b>{changed}\n"
+                f"<small><tt>{esc(led.name)}</tt></small>"
+            )
             default = service.defaults.get(led.name)
             if default is None:
                 tip = "No default recorded"
@@ -109,12 +113,12 @@ class LedCard(Gtk.Frame):
             self.reset_button.set_sensitive(not is_default)
 
             model = self.trigger.get_model()
-            names = [model.get_string(i) for i in range(model.get_n_items())]
-            if led.triggers and names != list(led.triggers):
-                model.splice(0, len(names), list(led.triggers))
-                names = list(led.triggers)
-            if led.active_trigger in names:
-                index = names.index(led.active_trigger)
+            trigger_names = [model.get_string(i) for i in range(model.get_n_items())]
+            if led.triggers and trigger_names != list(led.triggers):
+                model.splice(0, len(trigger_names), list(led.triggers))
+                trigger_names = list(led.triggers)
+            if led.active_trigger in trigger_names:
+                index = trigger_names.index(led.active_trigger)
                 if self.trigger.get_selected() != index:
                     self.trigger.set_selected(index)
 
