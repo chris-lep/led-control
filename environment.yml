@@ -1,0 +1,7 @@
+name: led-control
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pytest
+  - ruff

@@ -1,0 +1,28 @@
+[project]
+name = "led-control"
+version = "0.1.0"
+description = "GTK 4 GUI to control the LEDs exposed in /sys/class/leds (changes are temporary)"
+requires-python = ">=3.12"
+# Runtime needs PyGObject + GTK 4 from the system (python3-gi, gir1.2-gtk-4.0).
+dependencies = []
+
+[project.scripts]
+led-control = "ledcontrol.gui:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]

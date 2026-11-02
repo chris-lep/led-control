@@ -1,0 +1,5 @@
+#!/bin/sh
+# Launch the GUI with the system Python (it provides PyGObject/GTK 4;
+# a conda/venv Python usually does not).
+here=$(dirname "$(readlink -f "$0")")
+PYTHONPATH="$here/../src${PYTHONPATH:+:$PYTHONPATH}" exec /usr/bin/python3 -m ledcontrol "$@"
