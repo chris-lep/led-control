@@ -158,10 +158,12 @@ Setting up an environment, for example:
   . .venv/bin/activate
   pip install pytest ruff                                  # or, with pip 25.1+: pip install --group dev
   ```
-- **conda**: `conda env create -f environment.yml && conda activate led-control`.
-  Conda's Python can't see the system GTK, so `make test` skips the GUI tests and
-  `make test-all` runs them. For that, the env's Python version must match
-  `/usr/bin/python3 --version`; adjust `python=` in `environment.yml` if needed.
+- **conda**: conda's Python can't see the system GTK, so `make test` skips the GUI tests
+  and `make test-all` runs them. For that, give the env the system Python's version:
+  ```sh
+  conda create -n led-control python=$(/usr/bin/python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])') pytest ruff
+  conda activate led-control
+  ```
 
 All tests use a fake LED tree in a temp directory. None of them touch the real
 `/sys/class/leds` or need root.
