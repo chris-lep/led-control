@@ -108,3 +108,15 @@ def discover(root: Path = LEDS_ROOT) -> list[Led]:
     if not root.is_dir():
         return []
     return [read_led(p) for p in sorted(root.iterdir(), key=lambda p: p.name) if p.is_dir()]
+
+
+RFKILL_ROOT = Path("/sys/class/rfkill")
+
+
+def radios(root: Path = RFKILL_ROOT) -> dict[str, tuple[str, str]]:
+    """Map rfkill devices to (type, name), e.g. ``rfkill2 -> ("wlan", "phy0")``."""
+    if not root.is_dir():
+        return {}
+    return {
+        p.name: (_read(p / "type") or "", _read(p / "name") or "") for p in sorted(root.iterdir())
+    }

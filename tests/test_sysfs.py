@@ -58,3 +58,12 @@ def test_unreadable_values_fall_back(tmp_path: Path):
     (root / "x" / "max_brightness").unlink()
     led = sysfs.read_led(root / "x")
     assert (led.brightness, led.max_brightness) == (0, 1)
+
+
+def test_radios(tmp_path: Path):
+    for name, kind, dev in [("rfkill0", "bluetooth", "hci0"), ("rfkill1", "wlan", "phy0")]:
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "type").write_text(kind + "\n")
+        (tmp_path / name / "name").write_text(dev + "\n")
+    assert sysfs.radios(tmp_path) == {"rfkill0": ("bluetooth", "hci0"), "rfkill1": ("wlan", "phy0")}
+    assert sysfs.radios(tmp_path / "missing") == {}

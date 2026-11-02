@@ -9,7 +9,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from . import defaults, names, quirks  # noqa: E402
+from . import defaults, names, quirks, sysfs  # noqa: E402
 from .privileged import HelperClient, WriteError  # noqa: E402
 from .service import LedService  # noqa: E402
 from .sysfs import Led  # noqa: E402
@@ -46,7 +46,8 @@ class LedCard(Gtk.Frame):
         title.append(self.reset_button)
 
         self.grid = Gtk.Grid(column_spacing=12, row_spacing=6)
-        self.trigger = Gtk.DropDown.new_from_strings(list(led.triggers) or ["none"])
+        self._trigger_names = list(led.triggers) or ["none"]
+        self.trigger = Gtk.DropDown.new_from_strings(self._choices(self._trigger_names))
         self.trigger.set_enable_search(True)
         self.trigger.connect("notify::selected", self._on_trigger)
         self._add_row(0, "Trigger", self.trigger)
@@ -90,6 +91,9 @@ class LedCard(Gtk.Frame):
         self.set_child(box)
         self.update(led)
 
+    def _choices(self, triggers: list[str]) -> list[str]:
+        return [names.trigger_choice(t, self.window.radios) for t in triggers]
+
     def _add_row(self, row: int, text: str, widget: Gtk.Widget) -> None:
         label = Gtk.Label(label=text, xalign=0)
         label.add_css_class("dim-label")
@@ -127,12 +131,12 @@ class LedCard(Gtk.Frame):
             self.reset_button.set_sensitive(not is_default)
 
             model = self.trigger.get_model()
-            trigger_names = [model.get_string(i) for i in range(model.get_n_items())]
-            if led.triggers and trigger_names != list(led.triggers):
-                model.splice(0, len(trigger_names), list(led.triggers))
-                trigger_names = list(led.triggers)
-            if led.active_trigger in trigger_names:
-                index = trigger_names.index(led.active_trigger)
+            if led.triggers and self._trigger_names != list(led.triggers):
+                old = len(self._trigger_names)
+                self._trigger_names = list(led.triggers)
+                model.splice(0, old, self._choices(self._trigger_names))
+            if led.active_trigger in self._trigger_names:
+                index = self._trigger_names.index(led.active_trigger)
                 if self.trigger.get_selected() != index:
                     self.trigger.set_selected(index)
 
@@ -229,9 +233,12 @@ class LedCard(Gtk.Frame):
     def _on_trigger(self, dropdown: Gtk.DropDown, _pspec) -> None:
         if self._updating:
             return
-        item = dropdown.get_selected_item()
-        if item is not None and item.get_string() != self.led.active_trigger:
-            self._write("trigger", item.get_string())
+        index = dropdown.get_selected()
+        if index >= len(self._trigger_names):  # Gtk.INVALID_LIST_POSITION
+            return
+        trigger = self._trigger_names[index]
+        if trigger != self.led.active_trigger:
+            self._write("trigger", trigger)
 
     def _on_switch(self, switch: Gtk.Switch, _pspec) -> None:
         if not self._updating:
@@ -257,6 +264,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.service = service
         self.client = client
         self.cards: dict[str, LedCard] = {}
+        self.radios = sysfs.radios()
 
         header = Gtk.HeaderBar()
         refresh = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Refresh")
@@ -422,4 +430,9 @@ class LedControlApp(Gtk.Application):
 
 
 def main() -> int:
+    # WM_CLASS / app id must match the .desktop file name for the menu icon and
+    # taskbar grouping to work.
+    GLib.set_prgname(APP_ID)
+    GLib.set_application_name("LED Control")
+    Gtk.Window.set_default_icon_name(APP_ID)
     return LedControlApp().run(None)

@@ -21,7 +21,8 @@ software can't tell which ones exist, so this lets you check by looking.
 ## Running
 
 ```sh
-bin/led-control
+bin/led-control          # straight from the repo, or after installing:
+led-control              # or "LED Control" in the Cinnamon menu
 ```
 
 The app asks for your password once (polkit) and then runs a small root helper
@@ -30,6 +31,40 @@ for the rest of the session. If you cancel, it opens read-only; click **Unlock**
 Requirements, all preinstalled on Linux Mint 22: `/usr/bin/python3` with PyGObject and
 GTK 4 (`python3-gi`, `gir1.2-gtk-4.0`), and `pkexec`. The launcher always uses the system
 Python, because a conda/venv Python usually has no GTK bindings.
+
+## Install / uninstall (menu entry)
+
+```sh
+make install      # per user, into ~/.local; no root needed
+make uninstall
+```
+
+`make install` creates:
+
+| File | What |
+|---|---|
+| `~/.local/bin/led-control` | Symlink to `bin/led-control` in this repo |
+| `~/.local/share/applications/dev.lepenik.LedControl.desktop` | Menu entry, generated from `data/*.desktop.in` |
+| `~/.local/share/icons/hicolor/scalable/apps/dev.lepenik.LedControl.svg` | Icon |
+
+It then refreshes the desktop database and the user icon cache (the latter only if
+`icon-theme.cache` already exists). Because the launcher is a symlink, code changes take
+effect without reinstalling. After moving the repo, run `make install` again. Use
+`make install PREFIX=/some/dir` to install somewhere else.
+
+To do it by hand:
+
+```sh
+mkdir -p ~/.local/bin ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
+ln -sfn "$PWD/bin/led-control" ~/.local/bin/led-control
+sed "s|@BIN@|$HOME/.local/bin/led-control|" data/dev.lepenik.LedControl.desktop.in \
+  > ~/.local/share/applications/dev.lepenik.LedControl.desktop        # mode 644
+install -m 644 data/dev.lepenik.LedControl.svg ~/.local/share/icons/hicolor/scalable/apps/
+update-desktop-database ~/.local/share/applications
+gtk-update-icon-cache -t -f ~/.local/share/icons/hicolor            # if icon-theme.cache exists
+```
+
+To remove: delete those three files and run the two update commands again.
 
 ## How "defaults" work
 
@@ -79,10 +114,13 @@ echo audio-mute | sudo tee /sys/class/leds/platform::mute/trigger   # back to de
 | `src/ledcontrol/helper.py` | Root helper: JSON lines on stdin/stdout, validates every write. Stdlib only, run with `python3 -I` |
 | `src/ledcontrol/privileged.py` | Starts the helper via `pkexec` and talks to it |
 | `src/ledcontrol/defaults.py` | Per-boot default snapshot and reset logic |
+| `src/ledcontrol/names.py` | Readable titles for LEDs and triggers |
 | `src/ledcontrol/quirks.py` | Hardware facts sysfs doesn't report (ThinkPad firmware LEDs) |
 | `src/ledcontrol/service.py` | GUI-independent operations (set, reset, reset all) |
 | `src/ledcontrol/gui.py` | GTK 4 interface |
 | `bin/led-control` | Launcher |
+| `data/` | Desktop entry template and icon |
+| `Makefile` | install / uninstall / test / lint |
 
 The helper only writes regular, writable files located directly in
 `/sys/class/leds/<led>/`. It rejects path separators, symlinked attributes, `uevent`,
@@ -94,17 +132,14 @@ Dev tools live in a conda env (`environment.yml`: Python 3.12, pytest, ruff):
 
 ```sh
 conda env create -f environment.yml     # once
-conda activate led-control
-pytest                                  # GUI tests are skipped here (no GTK in conda)
-ruff check . && ruff format --check .
+make test        # pytest in the conda env; GUI tests are skipped (no GTK in conda)
+make test-all    # everything incl. GUI tests: system Python + pytest from the env
+make lint        # ruff check + format check
 ```
 
-The GUI tests need the system Python's GTK. Use the system Python with pytest from the env:
-
-```sh
-PYTHONPATH=~/miniconda3/envs/led-control/lib/python3.12/site-packages \
-  /usr/bin/python3 -m pytest -p no:cacheprovider
-```
+`make test-all` runs `/usr/bin/python3 -m pytest` with the env's `site-packages` on
+`PYTHONPATH`. That works because both are Python 3.12. If the env lives elsewhere, pass
+`ENV=/path/to/env`.
 
 All tests use a fake LED tree in a temp directory. None of them touch the real
 `/sys/class/leds` or need root.

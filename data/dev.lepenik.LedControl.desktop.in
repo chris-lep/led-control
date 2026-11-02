@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=LED Control
+GenericName=LED Settings
+Comment=Change the laptop's LEDs until the next reboot
+Exec=@BIN@
+Icon=dev.lepenik.LedControl
+Terminal=false
+Categories=Settings;HardwareSettings;GTK;
+Keywords=led;light;mute;lamp;backlight;keyboard;thinkpad;
+StartupNotify=true
+StartupWMClass=dev.lepenik.LedControl
