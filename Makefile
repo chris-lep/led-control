@@ -4,7 +4,7 @@
 # The launcher is a symlink into this repo, so code changes apply without
 # reinstalling. Re-run "make install" after moving the repo.
 
-APP_ID   := dev.lepenik.LedControl
+APP_ID   := io.github.chris_lep.LedControl
 PREFIX   ?= $(HOME)/.local
 BINDIR   := $(PREFIX)/bin
 APPSDIR  := $(PREFIX)/share/applications
@@ -17,7 +17,7 @@ DESKTOP  := $(APPSDIR)/$(APP_ID).desktop
 ICON     := $(ICONDIR)/$(APP_ID).svg
 
 # Dev tools from the conda env (see environment.yml).
-ENV      ?= $(HOME)/miniconda3/envs/led-control
+ENV      ?= $(shell conda run -n led-control python -c 'import sys; print(sys.prefix)' 2>/dev/null)
 # Must match the system Python's version, since test-all mixes the two.
 PYVER     = $(shell /usr/bin/python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
 ENVSITE   = $(ENV)/lib/python$(PYVER)/site-packages

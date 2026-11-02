@@ -14,7 +14,7 @@ from .privileged import HelperClient, WriteError  # noqa: E402
 from .service import LedService  # noqa: E402
 from .sysfs import Led  # noqa: E402
 
-APP_ID = "dev.lepenik.LedControl"
+APP_ID = "io.github.chris_lep.LedControl"
 REFRESH_SECONDS = 2
 IDENTIFY_INTERVAL_MS = 300
 

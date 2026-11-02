@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-APP_ID = "dev.lepenik.LedControl"
+APP_ID = "io.github.chris_lep.LedControl"
 
 pytestmark = pytest.mark.skipif(shutil.which("make") is None, reason="make not installed")
 

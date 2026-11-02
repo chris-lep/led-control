@@ -1,7 +1,8 @@
 # LED Control
 
-A small GTK 4 app for the LEDs the kernel exposes in `/sys/class/leds`
-(on this ThinkPad: mute/mic-mute, lid logo dot, keyboard backlight, power, lock keys, …).
+A small GTK 4 app for the LEDs the Linux kernel exposes in `/sys/class/leds`: for example
+the mute and mic-mute key LEDs, keyboard backlight and lock keys, and on ThinkPads also
+the power button LED and the lid logo dot.
 
 For every LED you can set:
 
@@ -13,7 +14,7 @@ For every LED you can set:
 and **reset** one LED or all of them to their defaults.
 
 **Identify** blinks an LED a few times and then restores its previous state. Drivers
-often list LEDs the hardware doesn't have (e.g. Num Lock or ThinkLight on a T14s), and
+often list LEDs the hardware doesn't have (e.g. Num Lock or ThinkLight on laptops without those lamps), and
 software can't tell which ones exist, so this lets you check by looking.
 
 **All changes are temporary.** They are written to sysfs only and are gone after a reboot.
@@ -22,15 +23,22 @@ software can't tell which ones exist, so this lets you check by looking.
 
 ```sh
 bin/led-control          # straight from the repo, or after installing:
-led-control              # or "LED Control" in the Cinnamon menu
+led-control              # or "LED Control" in your desktop's app menu
 ```
 
 The app asks for your password once (polkit) and then runs a small root helper
 for the rest of the session. If you cancel, it opens read-only; click **Unlock** to retry.
 
-Requirements, all preinstalled on Linux Mint 22: `/usr/bin/python3` with PyGObject and
-GTK 4 (`python3-gi`, `gir1.2-gtk-4.0`), and `pkexec`. The launcher always uses the system
-Python, because a conda/venv Python usually has no GTK bindings.
+Requirements:
+
+- `/usr/bin/python3` (3.12 or newer) with PyGObject and GTK 4.12 or newer.
+  Package names: `python3-gi gir1.2-gtk-4.0` (Debian/Ubuntu/Mint),
+  `python3-gobject gtk4` (Fedora), `python-gobject gtk4` (Arch).
+- polkit's `pkexec` and a polkit authentication agent, which every common desktop
+  environment runs.
+
+The launcher always uses the system Python, because a conda/venv Python usually has no
+GTK bindings.
 
 ## Install / uninstall (menu entry)
 
@@ -44,8 +52,8 @@ make uninstall
 | File | What |
 |---|---|
 | `~/.local/bin/led-control` | Symlink to `bin/led-control` in this repo |
-| `~/.local/share/applications/dev.lepenik.LedControl.desktop` | Menu entry, generated from `data/*.desktop.in` |
-| `~/.local/share/icons/hicolor/scalable/apps/dev.lepenik.LedControl.svg` | Icon |
+| `~/.local/share/applications/io.github.chris_lep.LedControl.desktop` | Menu entry, generated from `data/*.desktop.in` |
+| `~/.local/share/icons/hicolor/scalable/apps/io.github.chris_lep.LedControl.svg` | Icon |
 
 It then refreshes the desktop database and the user icon cache (the latter only if
 `icon-theme.cache` already exists). Because the launcher is a symlink, code changes take
@@ -57,9 +65,9 @@ To do it by hand:
 ```sh
 mkdir -p ~/.local/bin ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
 ln -sfn "$PWD/bin/led-control" ~/.local/bin/led-control
-sed "s|@BIN@|$HOME/.local/bin/led-control|" data/dev.lepenik.LedControl.desktop.in \
-  > ~/.local/share/applications/dev.lepenik.LedControl.desktop        # mode 644
-install -m 644 data/dev.lepenik.LedControl.svg ~/.local/share/icons/hicolor/scalable/apps/
+sed "s|@BIN@|$HOME/.local/bin/led-control|" data/io.github.chris_lep.LedControl.desktop.in \
+  > ~/.local/share/applications/io.github.chris_lep.LedControl.desktop        # mode 644
+install -m 644 data/io.github.chris_lep.LedControl.svg ~/.local/share/icons/hicolor/scalable/apps/
 update-desktop-database ~/.local/share/applications
 gtk-update-icon-cache -t -f ~/.local/share/icons/hicolor            # if icon-theme.cache exists
 ```
@@ -92,12 +100,14 @@ If you change one of these LEDs from a shell, the app can show it wrong.
 These LEDs only know on and off (and blink, via the `timer` trigger), although they report
 `max_brightness=255`, so the app shows a switch for them.
 
-The power LED's colour, the charging LED and the FnLock LED are handled entirely by the
-firmware. They are not in `/sys/class/leds`, so they can't be controlled.
+Other indicators, such as an FnLock LED, a charging LED or the power LED's colour, are
+often handled entirely by the firmware. If they don't appear in `/sys/class/leds`, they
+can't be controlled from Linux.
 
 ## Doing the same by hand
 
-Everything the app does is a plain write to sysfs:
+Everything the app does is a plain write to sysfs. LED names vary by machine;
+`ls /sys/class/leds` lists yours.
 
 ```sh
 cat /sys/class/leds/platform::mute/trigger              # [active] trigger is in brackets
@@ -128,7 +138,7 @@ The helper only writes regular, writable files located directly in
 
 ## Development
 
-Dev tools live in a conda env (`environment.yml`: Python 3.12, pytest, ruff):
+Dev tools live in a conda env (`environment.yml`: Python, pytest, ruff):
 
 ```sh
 conda env create -f environment.yml     # once
@@ -138,8 +148,10 @@ make lint        # ruff check + format check
 ```
 
 `make test-all` runs `/usr/bin/python3 -m pytest` with the env's `site-packages` on
-`PYTHONPATH`. That works because both are Python 3.12. If the env lives elsewhere, pass
-`ENV=/path/to/env`.
+`PYTHONPATH`. For that, the env's Python version must match the system Python's. Adjust
+`python=` in `environment.yml` if yours differs (`/usr/bin/python3 --version`).
+The Makefile finds the env via `conda run -n led-control`; pass `ENV=/path/to/env`
+to use a different one.
 
 All tests use a fake LED tree in a temp directory. None of them touch the real
 `/sys/class/leds` or need root.
