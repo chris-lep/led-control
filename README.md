@@ -143,3 +143,7 @@ make lint        # ruff check + format check
 
 All tests use a fake LED tree in a temp directory. None of them touch the real
 `/sys/class/leds` or need root.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

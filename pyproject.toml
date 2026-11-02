@@ -3,6 +3,8 @@ name = "led-control"
 version = "0.1.0"
 description = "GTK 4 GUI to control the LEDs exposed in /sys/class/leds (changes are temporary)"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 # Runtime needs PyGObject + GTK 4 from the system (python3-gi, gir1.2-gtk-4.0).
 dependencies = []
 
@@ -10,7 +12,7 @@ dependencies = []
 led-control = "ledcontrol.gui:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
