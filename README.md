@@ -149,21 +149,18 @@ make lint        # ruff check + format check
 
 Or use a specific interpreter without activating anything: `make test PYTHON=/path/to/python`.
 
-Setting up an environment, for example:
+For example, with a venv that can see the system's GTK bindings:
 
-- **venv** (recommended): it can see the system's GTK bindings, so `make test` already
-  includes the GUI tests.
-  ```sh
-  /usr/bin/python3 -m venv --system-site-packages .venv   # Debian/Ubuntu: needs python3-venv
-  . .venv/bin/activate
-  pip install pytest ruff                                  # or, with pip 25.1+: pip install --group dev
-  ```
-- **conda**: conda's Python can't see the system GTK, so `make test` skips the GUI tests
-  and `make test-all` runs them. For that, give the env the system Python's version:
-  ```sh
-  conda create -n led-control python=$(/usr/bin/python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])') pytest ruff
-  conda activate led-control
-  ```
+```sh
+/usr/bin/python3 -m venv --system-site-packages .venv   # Debian/Ubuntu: needs python3-venv
+. .venv/bin/activate
+pip install pytest ruff                                  # or, with pip 25.1+: pip install --group dev
+```
+
+The GUI tests need the system's PyGObject/GTK 4. In an environment whose Python can't
+import them, `make test` skips the GUI tests. `make test-all` runs them with the
+system Python, borrowing pytest from your environment. This works only if both Python
+versions are the same.
 
 All tests use a fake LED tree in a temp directory. None of them touch the real
 `/sys/class/leds` or need root.

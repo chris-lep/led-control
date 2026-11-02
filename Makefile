@@ -17,7 +17,7 @@ DESKTOP  := $(APPSDIR)/$(APP_ID).desktop
 ICON     := $(ICONDIR)/$(APP_ID).svg
 
 # Dev tools: run inside any Python environment that has pytest and ruff
-# (venv, conda, ...). Override with PYTHON=/path/to/python.
+# (e.g. a venv). Override with PYTHON=/path/to/python.
 PYTHON        ?= python3
 SYSTEM_PYTHON ?= /usr/bin/python3
 
