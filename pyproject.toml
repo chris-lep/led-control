@@ -11,6 +11,10 @@ dependencies = []
 [project.scripts]
 led-control = "ledcontrol.gui:main"
 
+[dependency-groups]
+# Dev tools only; the app itself needs nothing beyond the system's PyGObject/GTK 4.
+dev = ["pytest>=8", "ruff>=0.5"]
+
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"

@@ -16,11 +16,10 @@ BIN      := $(BINDIR)/led-control
 DESKTOP  := $(APPSDIR)/$(APP_ID).desktop
 ICON     := $(ICONDIR)/$(APP_ID).svg
 
-# Dev tools from the conda env (see environment.yml).
-ENV      ?= $(shell conda run -n led-control python -c 'import sys; print(sys.prefix)' 2>/dev/null)
-# Must match the system Python's version, since test-all mixes the two.
-PYVER     = $(shell /usr/bin/python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
-ENVSITE   = $(ENV)/lib/python$(PYVER)/site-packages
+# Dev tools: run inside any Python environment that has pytest and ruff
+# (venv, conda, ...). Override with PYTHON=/path/to/python.
+PYTHON        ?= python3
+SYSTEM_PYTHON ?= /usr/bin/python3
 
 .PHONY: install uninstall test test-all lint
 
@@ -48,12 +47,23 @@ _refresh:
 		then gtk-update-icon-cache -q -t -f "$(ICONROOT)"; fi
 
 test:
-	"$(ENV)/bin/python" -m pytest
+	$(PYTHON) -m pytest
 
-# Includes the GUI tests: system Python (GTK) + pytest from the conda env.
+# The GUI tests need GTK, which only the system Python has (unless your venv was
+# made with --system-site-packages, then "make test" runs them already). This
+# runs the system Python with pytest borrowed from $(PYTHON)'s environment.
 test-all:
-	PYTHONPATH="$(ENVSITE)" /usr/bin/python3 -m pytest -p no:cacheprovider
+	@$(PYTHON) -c 'import pytest' 2>/dev/null || { \
+		echo "$(PYTHON) has no pytest: activate your dev environment or pass PYTHON=..." >&2; \
+		exit 1; } && \
+	env_ver=$$($(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])') && \
+	sys_ver=$$($(SYSTEM_PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])') && \
+	if [ "$$env_ver" != "$$sys_ver" ]; then \
+		echo "$(PYTHON) is Python $$env_ver, $(SYSTEM_PYTHON) is $$sys_ver: they must match" >&2; \
+		exit 1; fi && \
+	site=$$($(PYTHON) -c 'import os, pytest; print(os.path.dirname(os.path.dirname(pytest.__file__)))') && \
+	PYTHONPATH="$$site" $(SYSTEM_PYTHON) -m pytest -p no:cacheprovider
 
 lint:
-	"$(ENV)/bin/ruff" check .
-	"$(ENV)/bin/ruff" format --check .
+	$(PYTHON) -m ruff check .
+	$(PYTHON) -m ruff format --check .

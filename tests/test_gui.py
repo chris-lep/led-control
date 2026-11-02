@@ -1,7 +1,7 @@
 """GUI smoke tests against a fake LED tree and the real helper protocol.
 
-Skipped where PyGObject/GTK 4 or a display is unavailable (e.g. in the conda
-env). See the README for running them with the system Python.
+Skipped where PyGObject/GTK 4 or a display is unavailable (e.g. in an
+environment that can't see the system's GTK). See "make test-all" in the README.
 """
 
 import os

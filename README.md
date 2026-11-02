@@ -37,8 +37,8 @@ Requirements:
 - polkit's `pkexec` and a polkit authentication agent, which every common desktop
   environment runs.
 
-The launcher always uses the system Python, because a conda/venv Python usually has no
-GTK bindings.
+The launcher always uses the system Python, because the Python of a virtual environment
+usually has no GTK bindings.
 
 ## Install / uninstall (menu entry)
 
@@ -138,20 +138,30 @@ The helper only writes regular, writable files located directly in
 
 ## Development
 
-Dev tools live in a conda env (`environment.yml`: Python, pytest, ruff):
+The only dev dependencies are pytest and ruff (`[dependency-groups] dev` in
+`pyproject.toml`). Activate any Python environment that has them, then:
 
 ```sh
-conda env create -f environment.yml     # once
-make test        # pytest in the conda env; GUI tests are skipped (no GTK in conda)
-make test-all    # everything incl. GUI tests: system Python + pytest from the env
+make test        # pytest
+make test-all    # also the GUI tests, with the system Python (see below)
 make lint        # ruff check + format check
 ```
 
-`make test-all` runs `/usr/bin/python3 -m pytest` with the env's `site-packages` on
-`PYTHONPATH`. For that, the env's Python version must match the system Python's. Adjust
-`python=` in `environment.yml` if yours differs (`/usr/bin/python3 --version`).
-The Makefile finds the env via `conda run -n led-control`; pass `ENV=/path/to/env`
-to use a different one.
+Or use a specific interpreter without activating anything: `make test PYTHON=/path/to/python`.
+
+Setting up an environment, for example:
+
+- **venv** (recommended): it can see the system's GTK bindings, so `make test` already
+  includes the GUI tests.
+  ```sh
+  /usr/bin/python3 -m venv --system-site-packages .venv   # Debian/Ubuntu: needs python3-venv
+  . .venv/bin/activate
+  pip install pytest ruff                                  # or, with pip 25.1+: pip install --group dev
+  ```
+- **conda**: `conda env create -f environment.yml && conda activate led-control`.
+  Conda's Python can't see the system GTK, so `make test` skips the GUI tests and
+  `make test-all` runs them. For that, the env's Python version must match
+  `/usr/bin/python3 --version`; adjust `python=` in `environment.yml` if needed.
 
 All tests use a fake LED tree in a temp directory. None of them touch the real
 `/sys/class/leds` or need root.
