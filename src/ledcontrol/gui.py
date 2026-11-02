@@ -16,6 +16,7 @@ from .sysfs import Led  # noqa: E402
 
 APP_ID = "dev.lepenik.LedControl"
 REFRESH_SECONDS = 2
+IDENTIFY_INTERVAL_MS = 300
 
 
 class LedCard(Gtk.Frame):
@@ -29,12 +30,19 @@ class LedCard(Gtk.Frame):
         self._updating = False
         self._extras_key: tuple = ()
         self._extra_entries: dict[str, Gtk.Entry] = {}
+        self._identify_restore: list[tuple[str, str]] | None = None
+        self._identify_source = 0
 
         title = Gtk.Box(spacing=8)
         self.title_label = Gtk.Label(xalign=0, hexpand=True)
         self.reset_button = Gtk.Button(label="Reset")
         self.reset_button.connect("clicked", self._on_reset)
+        self.identify_button = Gtk.Button(
+            label="Identify", tooltip_text="Blink this LED a few times, then restore it"
+        )
+        self.identify_button.connect("clicked", self._on_identify)
         title.append(self.title_label)
+        title.append(self.identify_button)
         title.append(self.reset_button)
 
         self.grid = Gtk.Grid(column_spacing=12, row_spacing=6)
@@ -90,7 +98,13 @@ class LedCard(Gtk.Frame):
 
     # --- state -> widgets ---------------------------------------------------
 
+    @property
+    def identifying(self) -> bool:
+        return self._identify_restore is not None
+
     def update(self, led: Led) -> None:
+        if self.identifying:
+            return  # the LED is blinking; don't mirror that in the widgets
         self._updating = True
         try:
             self.led = led
@@ -165,6 +179,52 @@ class LedCard(Gtk.Frame):
 
     def _on_reset(self, _button: Gtk.Button) -> None:
         self.window.run(self.window.service.reset, self.name)
+
+    def _on_identify(self, _button: Gtk.Button) -> None:
+        service = self.window.service
+        blink, restore = service.identify_plan(self.name)
+        self._identify_restore = restore
+        self._set_controls_sensitive(False)
+        steps = iter(blink)
+
+        def step() -> bool:
+            attr_value = next(steps, None)
+            if attr_value is None:
+                self.finish_identify()
+                return GLib.SOURCE_REMOVE
+            try:
+                service.set(self.name, *attr_value)
+            except WriteError as exc:
+                self.window.show_error(str(exc))
+                self.finish_identify()
+                return GLib.SOURCE_REMOVE
+            return GLib.SOURCE_CONTINUE
+
+        if step():
+            self._identify_source = GLib.timeout_add(IDENTIFY_INTERVAL_MS, step)
+
+    def finish_identify(self) -> None:
+        """Stop blinking and restore the state from before Identify."""
+        if self._identify_restore is None:
+            return
+        if self._identify_source:
+            GLib.source_remove(self._identify_source)
+            self._identify_source = 0
+        restore, self._identify_restore = self._identify_restore, None
+        try:
+            for attr, value in restore:
+                self.window.service.set(self.name, attr, value)
+        except WriteError as exc:
+            self.window.show_error(str(exc))
+        self._set_controls_sensitive(True)
+        self.window.refresh()
+
+    def _set_controls_sensitive(self, sensitive: bool) -> None:
+        for widget in (self.grid, self.identify_button):
+            widget.set_sensitive(sensitive)
+        if not sensitive:
+            self.reset_button.set_sensitive(False)
+        self.window.update_reset_all()
 
     def _on_trigger(self, dropdown: Gtk.DropDown, _pspec) -> None:
         if self._updating:
@@ -290,6 +350,10 @@ class MainWindow(Gtk.ApplicationWindow):
             self.show_error(str(exc))
         self.refresh()
 
+    def update_reset_all(self) -> None:
+        busy = any(card.identifying for card in self.cards.values())
+        self.reset_all.set_sensitive(self.client.running and not busy)
+
     def _reset_all(self) -> None:
         errors = self.service.reset_all()
         if errors:
@@ -350,6 +414,9 @@ class LedControlApp(Gtk.Application):
         self.window.present()
 
     def do_shutdown(self) -> None:
+        if self.window is not None:
+            for card in self.window.cards.values():
+                card.finish_identify()
         self.client.close()
         Gtk.Application.do_shutdown(self)
 

@@ -119,3 +119,27 @@ def test_firmware_led_gets_switch(app, tmp_path: Path):
     finally:
         client.close()
         win.destroy()
+
+
+def test_identify_blinks_and_restores(window, leds_root: Path, monkeypatch):
+    monkeypatch.setattr(gui, "IDENTIFY_INTERVAL_MS", 1)
+    card = window.cards["platform::mute"]
+    card.identify_button.emit("clicked")
+    assert card.identifying
+    assert not card.grid.get_sensitive()
+    assert not window.reset_all.get_sensitive()
+    assert (leds_root / "platform::mute" / "trigger").read_text() == "none"
+
+    spin(lambda: not card.identifying)
+    assert (leds_root / "platform::mute" / "trigger").read_text() == "audio-mute"
+    assert card.grid.get_sensitive()
+    assert window.reset_all.get_sensitive()
+
+
+def test_finish_identify_restores_immediately(window, leds_root: Path):
+    card = window.cards["tpacpi::kbd_backlight"]
+    card.identify_button.emit("clicked")
+    assert (leds_root / "tpacpi::kbd_backlight" / "brightness").read_text() == "2"
+    card.finish_identify()
+    assert not card.identifying
+    assert (leds_root / "tpacpi::kbd_backlight" / "brightness").read_text() == "0"

@@ -165,3 +165,28 @@ def test_firmware_led_reads_are_trusted_after_a_write(thinkpad: LedService, tmp_
 
     again.reset("tpacpi::power")
     assert again.led("tpacpi::power").brightness == 255
+
+
+def test_identify_plan_for_triggered_led(service: LedService):
+    blink, restore = service.identify_plan("platform::mute", toggles=4)
+    # mute LED is on (brightness 1) and driven by audio-mute
+    assert blink == [
+        ("trigger", "none"),
+        ("brightness", "0"),
+        ("brightness", "1"),
+        ("brightness", "0"),
+        ("brightness", "1"),
+    ]
+    assert restore == [("trigger", "audio-mute")]
+
+
+def test_identify_plan_for_untriggered_led(service: LedService):
+    blink, restore = service.identify_plan("tpacpi::kbd_backlight", toggles=2)
+    assert blink == [("brightness", "2"), ("brightness", "0")]
+    assert restore == [("trigger", "none"), ("brightness", "0")]
+
+
+def test_identify_restores_guessed_firmware_state(thinkpad: LedService):
+    blink, restore = thinkpad.identify_plan("tpacpi::power", toggles=2)
+    assert blink == [("brightness", "0"), ("brightness", "255")]
+    assert restore == [("trigger", "none"), ("brightness", "255")]

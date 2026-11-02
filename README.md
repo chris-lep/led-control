@@ -12,6 +12,10 @@ For every LED you can set:
 
 and **reset** one LED or all of them to their defaults.
 
+**Identify** blinks an LED a few times and then restores its previous state. Drivers
+often list LEDs the hardware doesn't have (e.g. Num Lock or ThinkLight on a T14s), and
+software can't tell which ones exist, so this lets you check by looking.
+
 **All changes are temporary.** They are written to sysfs only and are gone after a reboot.
 
 ## Running

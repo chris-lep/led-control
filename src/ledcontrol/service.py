@@ -68,6 +68,22 @@ class LedService:
             self.writer.write(name, attr, value)
             self._touch(name)
 
+    def identify_plan(
+        self, name: str, toggles: int = 8
+    ) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+        """Writes that blink an LED, and the writes that restore it afterwards.
+
+        The trigger is detached first so it can't fight the blinking, and the
+        first toggle is the opposite of the current state, so it is visible.
+        """
+        led = self.led(name)
+        blink = [] if led.active_trigger == "none" else [("trigger", "none")]
+        lit = led.brightness == 0
+        for _ in range(toggles):
+            blink.append(("brightness", str(led.max_brightness if lit else 0)))
+            lit = not lit
+        return blink, restore_ops(of(led))
+
     def reset_all(self) -> list[str]:
         """Reset every LED; returns error messages for the ones that failed."""
         errors = []
