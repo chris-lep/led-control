@@ -165,6 +165,11 @@ versions are the same.
 All tests use a fake LED tree in a temp directory. None of them touch the real
 `/sys/class/leds` or need root.
 
+CI runs lint and all tests, including the GUI tests on a virtual display, on every push
+([.github/workflows/ci.yml](.github/workflows/ci.yml)). Changes per version are listed in
+[CHANGELOG.md](CHANGELOG.md); releases are git tags `vX.Y.Z`, and the version lives in
+`pyproject.toml`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

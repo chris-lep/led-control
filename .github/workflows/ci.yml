@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # The app runs on the system Python with the system's PyGObject and GTK 4, so CI does too.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: System packages (Python 3.12, PyGObject, GTK 4, Xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-4.0 python3-venv xvfb
+
+      - name: Dev environment (venv that sees the system GTK bindings)
+        run: |
+          /usr/bin/python3 -m venv --system-site-packages .venv
+          .venv/bin/pip install pytest ruff
+
+      - name: Lint
+        run: make lint PYTHON=.venv/bin/python
+
+      - name: Tests, including the GUI tests on a virtual display
+        run: xvfb-run -a make test PYTHON=.venv/bin/python
+        env:
+          GSK_RENDERER: cairo
